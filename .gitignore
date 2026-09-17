@@ -1,0 +1,36 @@
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+credentials
+
+# AWS and SSH Keys
+*.pem
+*.key
+*.ppk
+.aws/
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+.venv/
+
+# Deployment & output artifacts
+output/*
+!output/.gitkeep
+*.log
+
+# Scratch & debug scripts
+scratch_*.py
+check_*.py
+rerun_*.py
+test_*.py
+
+# OS / IDE metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

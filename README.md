@@ -1,168 +1,260 @@
-# AWS Docker Automation Tasks
+# AWS Docker Automation Tasks 🚀
 
-Repositori ini berisi framework otomasi berbasis **Python (Boto3)** dan **Cloud-Init / User Data** untuk membuat, mengonfigurasi, dan men-deploy praktikum kontainerisasi **Docker** serta **Docker Compose** secara otomatis pada cloud **Amazon Web Services (AWS EC2)**.
+Selamat datang di repository **AWS Docker Automation Tasks**! Repository ini dirancang khusus untuk mempermudah siapa saja—termasuk **pemula yang baru belajar cloud computing dan Docker**—dalam mempraktikkan kontainerisasi aplikasi secara otomatis di atas infrastruktur cloud **Amazon Web Services (AWS EC2)**.
 
----
-
-## 🚀 Fitur & Modul Praktikum
-
-| Modul / Tugas | Deskripsi Praktikum | Port Layanan | Stack Teknologi |
-|---|---|:---:|---|
-| **LKPD 1** | Standalone Container Web | `8080` | Docker, HTTP Server |
-| **LKPD 2** | Multi-Container Web & Database Manual | `8088` | PHP Apache + MariaDB, Bridge Network |
-| **LKPD 3** | Custom Image Build via Dockerfile | `8001` | Ubuntu 24.04, Apache2, PHP MySQL |
-| **LKPD 4** | Siklus Docker Hub (Push, Pull & Run) | `8002` | Docker Hub Registry Integration |
-| **LKPD 5** | Multi-Container Orchestration Compose | `8088` | Docker Compose, MariaDB, AppToko |
-| **Tugas 2** | Deploy Aplikasi App ID Card | `8080` | Docker Compose, AppIDcard, MariaDB |
-| **Tugas 3** | Deploy Aplikasi Reservasi Ruangan | `8083` | Docker Compose, `php:8.2-apache`, `mariadb:11-jammy` |
+Proyek ini menyatukan seluruh modul praktikum **LKPD 1 hingga LKPD 5** serta **Tugas Deployment Aplikasi (Tugas 2 & Tugas 3)** ke dalam satu framework CLI berbasis **Python (Boto3)** dan **Cloud-Init (User Data)**.
 
 ---
 
-## 🏛️ Arsitektur & Alur Kerja
+## 📚 Modul & Lembar Kerja Peserta Didik (LKPD)
 
-```text
-[ Developer / CLI ]
-       │
-       ▼  (Boto3 API: VPC, Subnet, Security Group, AMI Resolver, EC2)
-[ AWS EC2 Instance (Ubuntu 24.04 LTS x86_64) ]
-       │
-       ▼  (Cloud-Init UserData: bootstrap.sh)
-[ Docker Engine & Docker Compose Plugin ]
-       │
-       ├─► LKPD 1-5  : Praktikum Mandiri Kontainer Docker
-       ├─► Tugas 2   : Docker Compose (App ID Card)
-       └─► Tugas 3   : Docker Compose (Aplikasi Reservasi Ruangan)
+Seluruh dokumen materi panduan resmi tersedia dalam format PDF di folder [`docs/pdf/`](docs/pdf/). Berikut adalah penjelasan cerita dan kompetensi di balik setiap modul:
+
+### 1. [LKPD 1 - Dasar Docker dan Web Server HTTP](docs/pdf/LKPD%201%20-%20Dasar%20Docker.pdf)
+* **Kisah & Tujuan**: Memulai langkah pertama di dunia kontainer. Anda diajak memahami arsitektur daemon Docker pada Linux Ubuntu, perintah lifecycle kontainer (`pull`, `run`, `ps`, `stop`, `rm`), teknik port binding (`-p 8080:80`), dan volume mounting dari host ke kontainer (`-v /var/mywww:/var/www/html`).
+* **Hasil Akhir**: Web server Apache HTTPD berjalan di container dan melayani halaman web di port **8080**.
+
+### 2. [LKPD 2 - Deploy Aplikasi PHP dan MySQL (Multi-Container)](docs/pdf/LKPD%202%20-%20Deploy%20App%20Multi%20Container.pdf)
+* **Kisah & Tujuan**: Aplikasi modern tidak pernah menyatukan kode PHP dan database MySQL dalam satu mesin monolitik. Di LKPD 2, kita memisahkan arsitektur menjadi dua kontainer terisolasi: `webserver` (AppToko PHP) dan `dbserver` (`mariadb:11-jammy`).
+* **Konsep Kunci**: Custom bridge network (`mynet`) agar kedua kontainer bisa saling berkomunikasi menggunakan nama hostname internal (`dbserver:3306`) tanpa membuka port database ke internet publik.
+* **Hasil Akhir**: Aplikasi AppToko berjalan terhubung dengan database di port **8088**.
+
+### 3. [LKPD 3 - Membangun Image dengan Dockerfile](docs/pdf/LKPD%203%20-%20Dockerfile.pdf)
+* **Kisah & Tujuan**: Membuat kontainer manual dengan `docker commit` memiliki kelemahan: tidak terdokumentasi dan sulit diulang (*reproducible*). Di LKPD 3, kita mempelajari **Infrastructure as Code (IaC)** untuk kontainer menggunakan `Dockerfile`.
+* **Konsep Kunci**: Penggunaan instruksi `FROM ubuntu:24.04`, `ENV`, `RUN apt update && apt install ...`, `EXPOSE 80`, dan `CMD ["apache2ctl", "-D", "FOREGROUND"]`.
+* **Hasil Akhir**: Image buatan sendiri `ubuntu-ws:v1` yang siap menjalankan aplikasi web di port **8001**.
+
+### 4. [LKPD 4 - Publikasi Docker Image ke Docker Hub](docs/pdf/LKPD%204%20-%20Publikasi%20Docker%20Image%20ke%20Docker%20Hub.pdf)
+* **Kisah & Tujuan**: Image yang sudah kita bangun di LKPD 3 perlu dibagikan ke tim pengembang lain atau server produksi. Kita menghubungkan terminal server dengan registri publik **Docker Hub**.
+* **Konsep Kunci**: Autentikasi CLI (`docker login`), penamaan tag sesuai namespace (`username/ubuntu-ws:v1`), proses `docker push`, pengujian hapus image lokal (`docker rmi`), dan membuktikan image dapat di-pull ulang dari internet lalu dijalankan di port **8002**.
+* **Hasil Akhir**: Kontainer `webserver2` live menggunakan image dari Docker Hub di port **8002**.
+
+### 5. [LKPD 5 - Multi-Container Orchestration dengan Docker Compose](docs/pdf/LKPD%205%20-%20Docker%20Compose.pdf)
+* **Kisah & Tujuan**: Mengetik puluhan perintah `docker run` dengan banyak parameter flags sangat rawan kesalahan manusia (*human error*). Solusinya adalah **Docker Compose**: satu file deklaratif `docker-compose.yml` untuk mengelola seluruh stack aplikasi (web, database, volume, network).
+* **Konsep Kunci**: Struktur file Compose (`version`, `services`, `environment`, `depends_on`, `volumes`), dan perintah manajemen `docker compose up -d`, `docker compose ps`, dan `docker compose down`.
+* **Hasil Akhir**: Orkestrasi multi-kontainer otomatis berjalan rapi di port **8088**.
+
+### 6. Tugas 2 - Aplikasi ID Card (Docker Compose)
+* **Kisah & Tujuan**: Praktik deployment aplikasi formulir dan pencetak kartu identitas siswa ([paknux/appIDcard](https://github.com/paknux/appIDcard)).
+* **Stack**: Docker Compose, PHP webserver, MariaDB 11, auto database configuration (`konfig.php`), melayani di port **8080**.
+
+### 7. Tugas 3 - Aplikasi Reservasi Ruangan (Docker Compose + MariaDB 11)
+* **Kisah & Tujuan**: Deployment aplikasi reservasi ruangan rapat dan fasilitas hotel ([paknux/appReservasi](https://github.com/paknux/appReservasi)).
+* **Stack**: Docker Compose, Webserver custom build dari `php:8.2-apache` + ekstensi `pdo_mysql`, database `mariadb:11-jammy`, volume persistent `db_data`, serta auto-import database dari file `reservasi_ruangan.sql`.
+* **Hasil Akhir**: Aplikasi dapat diakses publik melalui browser di port **8083**.
+
+---
+
+## 🧭 Tutorial Step-by-Step untuk Pemula
+
+Panduan ini disusun langkah demi langkah agar Anda dapat langsung menjalankannya dari laptop/komputer Anda:
+
+### Langkah 1: Klon Repositori & Persiapan Python
+Buka terminal (Git Bash, Command Prompt, atau PowerShell), lalu jalankan:
+```bash
+# 1. Clone repository ini
+git clone https://github.com/yasss31/aws-docker-automation-tasks.git
+cd aws-docker-automation-tasks
+
+# 2. Instal library Python yang dibutuhkan
+pip install -r requirements.txt
 ```
 
 ---
 
-## 📋 Prasyarat
-
-1. **Python 3.10+**
-2. **Akun AWS** (didukung penuh untuk akun reguler maupun **AWS Academy Learner Lab / Vocareum**)
-3. Dependencies Python:
+### Langkah 2: Menyiapkan Kredensial AWS di File `.env`
+1. Gandakan file `.env.example` menjadi `.env`:
    ```bash
-   pip install -r requirements.txt
-   ```
-
----
-
-## ⚙️ Panduan Konfigurasi Awal
-
-1. Salin template konfigurasi `.env.example` menjadi `.env`:
-   ```bash
+   # Di Linux / macOS:
    cp .env.example .env
-   # Atau pada Windows PowerShell:
+
+   # Di Windows PowerShell:
    Copy-Item .env.example .env
    ```
-
-2. Buka file `.env` dan lengkapi kredensial AWS aktif Anda:
-   ```ini
-   AWS_REGION=us-east-1
-   AWS_ACCESS_KEY_ID=ASIA...
-   AWS_SECRET_ACCESS_KEY=...
-   AWS_SESSION_TOKEN=IQoJ...  # Wajib jika menggunakan AWS Academy
-   ```
-
-3. *(Opsional)* Jika ingin menguji push image pada LKPD 4, isi token Docker Hub:
-   ```ini
-   DOCKERHUB_USERNAME=username_anda
-   DOCKERHUB_TOKEN=dckr_pat_...
-   ```
-
-> [!IMPORTANT]
-> Jangan pernah meng-commit file `.env` atau file kredensial (*.pem, *.key) ke Git repository. File-file tersebut telah otomatis diabaikan oleh `.gitignore`.
+2. Buka file `.env` menggunakan teks editor (misal VS Code atau Notepad).
+3. Jika Anda menggunakan **AWS Academy Learner Lab**:
+   - Buka halaman lab AWS Academy Anda.
+   - Klik tombol **AWS Details**, lalu lihat bagian **AWS CLI**.
+   - Salin dan tempelkan nilainya ke `.env`:
+     ```ini
+     AWS_REGION=us-east-1
+     AWS_ACCESS_KEY_ID=ASIA...
+     AWS_SECRET_ACCESS_KEY=...
+     AWS_SESSION_TOKEN=IQoJ...
+     ```
+   *(Catatan: Token sesi AWS Academy bersifat sementara dan perlu diperbarui jika sesi lab dimulai ulang).*
 
 ---
 
-## 💻 Penggunaan Perintah CLI
-
-Seluruh kontrol otomasi dijalankan melalui file utama `main.py`:
-
-### 1. Pre-Flight Validation (Uji Kredensial & Resource)
-Memverifikasi kredensial AWS STS, VPC default, subnet, AMI Ubuntu, Key Pair `vockey`, IAM Profile, dan aturan Security Group sebelum membuat instance:
+### Langkah 3: Melakukan Pre-Flight Validation
+Sebelum membuat mesin EC2 nyata di cloud, jalankan validasi otomatis untuk memastikan akun AWS dan konfigurasi sudah valid:
 ```bash
 python main.py validate
 ```
+Skrip ini akan memeriksa:
+- [x] Koneksi STS AWS
+- [x] Default VPC & Subnet
+- [x] Ketersediaan AMI Ubuntu 24.04 LTS
+- [x] Key Pair `vockey`
+- [x] IAM Instance Profile `LabInstanceProfile`
+- [x] Sinkronisasi Security Group `lkpd-docker-sg`
 
-### 2. Membuat Instance & Menjalankan Otomasi Deployment (`create`)
+Jika muncul pesan `SEMUA VALIDASI BERHASIL!`, lingkungan siap digunakan!
 
-- **Deploy Tugas 3 (Aplikasi Reservasi Ruangan):**
-  ```bash
-  python main.py create --tugas3
-  ```
-- **Deploy Tugas 2 (App ID Card):**
-  ```bash
-  python main.py create --tugas2
-  ```
-- **Deploy LKPD Tertentu (Contoh LKPD 1 sampai 5):**
-  ```bash
-  python main.py create --lkpd 1
-  ```
-- **Deploy Seluruh LKPD 1 sampai 5 Sekaligus:**
-  ```bash
-  python main.py create --all
-  ```
+---
 
-### 3. Memeriksa Status Instance & IP Publik (`status`)
+### Langkah 4: Meluncurkan Praktikum / Tugas Pilihan
 
-- **Melihat seluruh instance aktif:**
-  ```bash
-  python main.py status
-  ```
-- **Filter khusus Tugas 3:**
-  ```bash
-  python main.py status --tugas3
-  ```
+Anda dapat memilih tugas mana yang ingin dibuatkan server EC2-nya secara otomatis:
 
-### 4. Diagnosa Runtime Mendalam (`inspect`)
-Menginspeksi status respon HTTP langsung dari luar, status Cloud-Init `/opt/lkpd/status.json`, serta daftar kontainer Docker aktif via AWS Systems Manager (SSM):
+#### Ingin Menjalankan Tugas 3 (Aplikasi Reservasi Ruangan)?
 ```bash
-python main.py inspect
+python main.py create --tugas3
+```
+Skrip akan membuat EC2 bernama `tugas-3-reservasi`, menginstal Docker, meng-clone repositori, menyiapkan `Dockerfile` & `docker-compose.yml`, melakukan import SQL, dan menguji hingga HTTP 200 OK.
+
+#### Ingin Menjalankan Tugas 2 (Aplikasi ID Card)?
+```bash
+python main.py create --tugas2
 ```
 
-### 5. Menghapus / Terminasi Instance (`terminate`)
-Setelah selesai sesi praktikum atau penilaian, terminate instance agar menghemat kuota lab:
+#### Ingin Menjalankan Salah Satu LKPD (Misal LKPD 1)?
 ```bash
-python main.py terminate --tugas3   # Khusus instance Tugas 3
-python main.py terminate --tugas2   # Khusus instance Tugas 2
-python main.py terminate --lkpd 1   # Khusus LKPD 1
-python main.py terminate --all      # Hapus semua instance LKPD
+python main.py create --lkpd 1
+```
+*(Ganti angka `1` dengan nomor LKPD `2`, `3`, `4`, atau `5` sesuai kebutuhan)*.
+
+#### Ingin Menjalankan Seluruh LKPD 1 s.d. 5 Sekaligus?
+```bash
+python main.py create --all
 ```
 
 ---
 
-## 📂 Struktur Direktori
+### Langkah 5: Memeriksa Status & Membuka di Web Browser
+
+1. **Cek IP Publik Server:**
+   ```bash
+   python main.py status
+   ```
+   Atau cek khusus tugas tertentu:
+   ```bash
+   python main.py status --tugas3
+   ```
+   Anda akan melihat tabel berisi **Instance ID**, **State (running)**, dan **Public IP**.
+
+2. **Diagnosa Runtime (Live Inspect):**
+   ```bash
+   python main.py inspect
+   ```
+   Perintah ini akan mengetes respon HTTP langsung dari luar dan membaca log kontainer Docker yang sedang aktif di dalam server.
+
+3. **Buka di Browser:**
+   Ambil **Public IP** instance Anda, lalu buka browser:
+   - **Tugas 3:** `http://<PUBLIC_IP>:8083` *(Login default: admin / admin123)*
+   - **Tugas 2:** `http://<PUBLIC_IP>:8080`
+   - **LKPD 1:** `http://<PUBLIC_IP>:8080`
+   - **LKPD 2:** `http://<PUBLIC_IP>:8088`
+   - **LKPD 3:** `http://<PUBLIC_IP>:8001`
+   - **LKPD 4:** `http://<PUBLIC_IP>:8002`
+   - **LKPD 5:** `http://<PUBLIC_IP>:8088`
+
+---
+
+### Langkah 6: Menghapus / Mematikan Server (Terminate)
+
+> [!TIP]
+> Kuota saldo di AWS Academy atau cloud publik terbatas. Jika sesi praktikum atau penilaian sudah selesai, selalu hapus instance yang tidak lagi digunakan.
+
+- **Hapus instance Tugas 3 saja:**
+  ```bash
+  python main.py terminate --tugas3
+  ```
+- **Hapus instance Tugas 2 saja:**
+  ```bash
+  python main.py terminate --tugas2
+  ```
+- **Hapus LKPD tertentu:**
+  ```bash
+  python main.py terminate --lkpd 1
+  ```
+- **Hapus seluruh instance LKPD yang berjalan:**
+  ```bash
+  python main.py terminate --all
+  ```
+
+---
+
+## 🛡️ Port Mapping & Keamanan Jaringan
+
+Security Group (`lkpd-docker-sg`) secara otomatis dikonfigurasi oleh sistem:
+
+| Port | Protokol | Akses | Peruntukan |
+|:---:|:---:|:---:|---|
+| **22** | TCP | Publik (`0.0.0.0/0`) | Akses Terminal Remote via SSH |
+| **80** / **443** | TCP | Publik (`0.0.0.0/0`) | Standar Web HTTP / HTTPS |
+| **8080** | TCP | Publik (`0.0.0.0/0`) | LKPD 1 (Docker HTTP) & Tugas 2 (App ID Card) |
+| **8088** | TCP | Publik (`0.0.0.0/0`) | LKPD 2 (Multi-Container) & LKPD 5 (Docker Compose) |
+| **8001** | TCP | Publik (`0.0.0.0/0`) | LKPD 3 (Custom Image Dockerfile) |
+| **8002** | TCP | Publik (`0.0.0.0/0`) | LKPD 4 (Docker Hub Image) |
+| **8083** | TCP | Publik (`0.0.0.0/0`) | Tugas 3 (Aplikasi Reservasi Ruangan) |
+| **3306** | TCP | Internal / Opsional | MariaDB / MySQL Database Server |
+
+---
+
+## 📁 Struktur Direktori Repository
 
 ```text
 aws-docker-automation-tasks/
-├── aws/                   # Modul interaksi AWS SDK (Boto3)
-│   ├── ami.py             # Resolver AMI Ubuntu resmi via SSM Parameter Store
-│   ├── diagnostics.py     # Engine inspeksi live status runtime & HTTP check
-│   ├── ec2.py             # Lifecycle EC2 (Launch, Wait, Status, Terminate)
-│   └── network.py         # Resolver VPC, Subnet, dan sync Security Group rules
+├── docs/
+│   └── pdf/               # Lembar Kerja Peserta Didik (LKPD 1 s.d. 5 PDF)
+│       ├── LKPD 1 - Dasar Docker.pdf
+│       ├── LKPD 2 - Deploy App Multi Container.pdf
+│       ├── LKPD 3 - Dockerfile.pdf
+│       ├── LKPD 4 - Publikasi Docker Image ke Docker Hub.pdf
+│       └── LKPD 5 - Docker Compose.pdf
+├── aws/                   # Modul SDK AWS Boto3
+│   ├── ami.py             # SSM Parameter Store AMI Resolver
+│   ├── diagnostics.py     # Live Runtime Inspector (HTTP & SSM Logs)
+│   ├── ec2.py             # EC2 Management (Run, Describe, Terminate)
+│   └── network.py         # VPC, Subnet, dan Security Group Rule Sync
 ├── config/
-│   └── settings.py        # Pengelola variabel konfigurasi environment
-├── lkpd/                  # Definisi kelas controller masing-masing modul
-│   ├── base.py            # Base abstract class LKPD runner
+│   └── settings.py        # Environment Configuration Loader
+├── lkpd/                  # Controllers Modul LKPD & Tugas
+│   ├── base.py            # Base abstract class & template renderer
 │   ├── lkpd1.py s.d lkpd5.py
 │   ├── tugas2.py          # Controller Tugas 2 (App ID Card)
 │   └── tugas3.py          # Controller Tugas 3 (App Reservasi Ruangan)
-├── templates/             # Shell script Cloud-Init yang dieksekusi di EC2
-│   ├── bootstrap.sh       # Inisialisasi Docker, Git, Tools & health helper
+├── templates/             # Script UserData Cloud-Init
+│   ├── bootstrap.sh       # Inisialisasi dependensi & health helper
 │   ├── lkpd1.sh s.d lkpd5.sh
-│   ├── tugas2_idcard.sh
-│   └── tugas3_reservasi.sh
-├── output/                # Ringkasan hasil deployment (summary.json)
-├── .env.example           # Template variabel environment
-├── .gitignore             # Proteksi berkas sensitif dan artefak lokal
-├── main.py                # CLI Entrypoint aplikasi
-├── requirements.txt       # Daftar dependensi Python
-└── README.md
+│   ├── tugas2_idcard.sh   # Script otomasi Tugas 2
+│   └── tugas3_reservasi.sh# Script otomasi Tugas 3
+├── output/                # Artefak lokal hasil eksekusi (summary.json)
+├── .env.example           # Template kredensial tanpa rahasia
+├── .gitignore             # Proteksi berkas sensitif (.env, .pem, dsb.)
+├── main.py                # File utama (CLI Entrypoint)
+├── requirements.txt       # Daftar pustaka Python
+└── README.md              # Dokumentasi lengkap proyek
 ```
 
 ---
 
-## 📄 Lisensi
+## ❓ Tanya Jawab & Troubleshooting Pemula (FAQ)
 
-Proyek ini dibuat untuk kebutuhan pembelajaran dan otomatisasi praktikum cloud computing AWS.
+1. **Bagaimana jika halaman web tidak mau terbuka di browser?**
+   - Pastikan status instance sudah `running` (`python main.py status`).
+   - Tunggu 1–2 menit setelah instance running karena server butuh waktu untuk bootstrap mengunduh Docker dan image aplikasi.
+   - Cek apakah port yang diakses sudah sesuai (misal Tugas 3 pada port `:8083`).
+   - Gunakan `python main.py inspect` untuk melihat apakah server sudah merespon `HTTP 200 OK`.
+
+2. **Muncul error `ExpiredToken` dari AWS?**
+   - Jika Anda menggunakan AWS Academy, session token hanya bertahan beberapa jam.
+   - Buka kembali tombol **AWS Details** pada AWS Academy, salin `aws_access_key_id`, `aws_secret_access_key`, dan `aws_session_token` yang baru, lalu perbarui di file `.env`.
+
+3. **Apakah file `.env` saya aman?**
+   - Sangat aman. File `.env` dan file kunci `*.pem` telah didaftarkan di dalam `.gitignore`, sehingga tidak akan pernah terunggah ke repositori publik GitHub.
+
+---
+
+Selamat belajar dan berpraktik Docker & Cloud Computing! 🎉

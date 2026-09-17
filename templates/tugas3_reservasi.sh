@@ -2,8 +2,8 @@
 source /opt/lkpd/bootstrap.sh
 
 TASK_NAME="tugas3"
-echo "=== MEMULAI EKSEKUSI TUGAS 3: DEPLOY APLIKASI RESERVASI RUANGAN (DOCKER COMPOSE) ==="
-update_status "${TASK_NAME}" "in_progress" "init" "Memulai inisialisasi Tugas 3 Reservasi Ruangan"
+echo "=== MEMULAI EKSEKUSI TUGAS 3: DEPLOY APLIKASI RESERVASI RUANGAN (HAPROXY + 2 WEBSERVERS + MARIADB) ==="
+update_status "${TASK_NAME}" "in_progress" "init" "Memulai inisialisasi Tugas 3 Reservasi Ruangan (HAProxy Load Balancer)"
 
 USER_HOME="/home/ubuntu"
 if [ ! -d "${USER_HOME}" ]; then
@@ -14,11 +14,13 @@ REPO_URL="https://github.com/paknux/appReservasi.git"
 
 # 1. Menyiapkan direktori kerja & clone repositori
 update_status "${TASK_NAME}" "in_progress" "git_clone" "Meng-clone repository appReservasi dari ${REPO_URL}"
-rm -rf "${APP_DIR}"
-retry_cmd 3 5 git clone "${REPO_URL}" "${APP_DIR}" || {
-    update_status "${TASK_NAME}" "failed" "clone_failed" "Gagal meng-clone repository ${REPO_URL}"
-    exit 1
-}
+if [ ! -d "${APP_DIR}/.git" ]; then
+    rm -rf "${APP_DIR}"
+    retry_cmd 3 5 git clone "${REPO_URL}" "${APP_DIR}" || {
+        update_status "${TASK_NAME}" "failed" "clone_failed" "Gagal meng-clone repository ${REPO_URL}"
+        exit 1
+    }
+fi
 
 cd "${APP_DIR}"
 
@@ -60,17 +62,66 @@ WORKDIR /var/www/html
 EXPOSE 80
 EOF
 
-# 5. Membuat docker-compose.yml
-update_status "${TASK_NAME}" "in_progress" "write_compose" "Membuat docker-compose.yml (webserver:8083 & dbserver:mariadb:11-jammy)"
+# 5. Membuat konfigurasi HAProxy (haproxy.cfg)
+update_status "${TASK_NAME}" "in_progress" "write_haproxy_cfg" "Membuat haproxy.cfg (Frontend :8080 -> Backend webserver1:80 & webserver2:80 roundrobin)"
+cat <<'EOF' > "${APP_DIR}/haproxy.cfg"
+global
+    log stdout format raw local0
+
+defaults
+    log global
+    mode http
+    option httplog
+    timeout connect 5s
+    timeout client 30s
+    timeout server 30s
+
+frontend http_front
+    bind *:8080
+    default_backend web_servers
+
+backend web_servers
+    balance roundrobin
+    option httpchk GET /
+    server webserver1 webserver1:80 check
+    server webserver2 webserver2:80 check
+EOF
+
+# 6. Membuat docker-compose.yml (4 Kontainer: haproxy + webserver1 + webserver2 + dbserver)
+update_status "${TASK_NAME}" "in_progress" "write_compose" "Membuat docker-compose.yml (haproxy:8083, webserver1, webserver2, dbserver)"
 cat <<EOF > "${APP_DIR}/docker-compose.yml"
 services:
-  webserver:
+  haproxy:
+    image: haproxy:latest
+    container_name: haproxy
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - webserver1
+      - webserver2
+    restart: unless-stopped
+
+  webserver1:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: webserver
-    ports:
-      - "8083:80"
+    image: appreservasi-webserver:latest
+    container_name: webserver1
+    expose:
+      - "80"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - dbserver
+    restart: unless-stopped
+
+  webserver2:
+    image: appreservasi-webserver:latest
+    container_name: webserver2
+    expose:
+      - "80"
     volumes:
       - ./:/var/www/html
     depends_on:
@@ -96,15 +147,16 @@ EOF
 chown -R ubuntu:ubuntu "${APP_DIR}" 2>/dev/null || true
 chmod -R 775 "${APP_DIR}"
 
-# 6. Menjalankan Docker Compose Build & Up
-update_status "${TASK_NAME}" "in_progress" "compose_up" "Membangun dan menjalankan container dengan docker compose up -d --build"
-docker compose down -v 2>/dev/null || true
+# 7. Menjalankan Docker Compose Build & Up
+update_status "${TASK_NAME}" "in_progress" "compose_up" "Membangun dan menjalankan 4 container dengan docker compose up -d --build"
+retry_cmd 3 5 docker pull haproxy:latest || true
+docker compose down 2>/dev/null || true
 retry_cmd 3 5 docker compose up -d --build || {
     update_status "${TASK_NAME}" "failed" "compose_failed" "Gagal menjalankan docker compose up -d --build"
     exit 1
 }
 
-# 7. Menunggu kesiapan MariaDB (dbserver)
+# 8. Menunggu kesiapan MariaDB (dbserver)
 update_status "${TASK_NAME}" "in_progress" "wait_db" "Menunggu database MariaDB di dbserver siap melayani koneksi"
 DB_READY=false
 for i in $(seq 1 40); do
@@ -122,7 +174,7 @@ if [ "${DB_READY}" != "true" ]; then
     exit 1
 fi
 
-# 8. Verifikasi inisialisasi tabel di db_reservasi_ruangan
+# 9. Verifikasi inisialisasi tabel di db_reservasi_ruangan
 TABLE_CHECK=$(docker exec dbserver mariadb -u root -proot123 -e "USE db_reservasi_ruangan; SHOW TABLES;" 2>/dev/null || true)
 echo "[DB TABLES] Tabel yang ditemukan:"
 echo "${TABLE_CHECK}"
@@ -132,18 +184,18 @@ if ! echo "${TABLE_CHECK}" | grep -qE "rooms|bookings|users"; then
     docker exec -i dbserver mariadb -u root -proot123 db_reservasi_ruangan < "${APP_DIR}/${SQL_BASENAME}" || true
 fi
 
-# Restart webserver untuk memastikan koneksi PDO segar
-docker restart webserver
-sleep 3
+# Restart webserver1, webserver2 & haproxy untuk memastikan koneksi segar
+docker restart webserver1 webserver2 haproxy
+sleep 4
 
-# 9. Verifikasi HTTP Status Port 8083
-update_status "${TASK_NAME}" "in_progress" "http_check" "Menguji HTTP response pada port 8083"
+# 10. Verifikasi HTTP Status Port 8083 melalui HAProxy
+update_status "${TASK_NAME}" "in_progress" "http_check" "Menguji HTTP response pada port 8083 via HAProxy Load Balancer"
 if ! check_http_status "http://localhost:8083" "200|302" 20 3; then
-    update_status "${TASK_NAME}" "failed" "http_failed" "Aplikasi pada http://localhost:8083 tidak merespon HTTP 200/302"
-    docker logs webserver --tail 30
+    update_status "${TASK_NAME}" "failed" "http_failed" "Aplikasi pada http://localhost:8083 tidak merespon HTTP 200/302 via HAProxy"
+    docker logs haproxy --tail 30
     exit 1
 fi
 
-# 10. Finalisasi status sukses
-update_status "${TASK_NAME}" "verified" "ready" "Tugas 3 Aplikasi Reservasi Ruangan aktif dan melayani HTTP 200 di port 8083"
-echo "=== DEPLOYMENT TUGAS 3 RESERVASI RUANGAN BERHASIL! ==="
+# 11. Finalisasi status sukses
+update_status "${TASK_NAME}" "verified" "ready" "Tugas 3 Aplikasi Reservasi Ruangan (HAProxy + 2 Webservers + MariaDB) aktif di port 8083"
+echo "=== DEPLOYMENT TUGAS 3 HAPROXY BERHASIL (4 KONTANER AKTIF)! ==="

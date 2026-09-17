@@ -38,10 +38,14 @@ Seluruh dokumen materi panduan resmi tersedia dalam format PDF di folder [`docs/
 * **Kisah & Tujuan**: Praktik deployment aplikasi formulir dan pencetak kartu identitas siswa ([paknux/appIDcard](https://github.com/paknux/appIDcard)).
 * **Stack**: Docker Compose, PHP webserver, MariaDB 11, auto database configuration (`konfig.php`), melayani di port **8080**.
 
-### 7. Tugas 3 - Aplikasi Reservasi Ruangan (Docker Compose + MariaDB 11)
-* **Kisah & Tujuan**: Deployment aplikasi reservasi ruangan rapat dan fasilitas hotel ([paknux/appReservasi](https://github.com/paknux/appReservasi)).
-* **Stack**: Docker Compose, Webserver custom build dari `php:8.2-apache` + ekstensi `pdo_mysql`, database `mariadb:11-jammy`, volume persistent `db_data`, serta auto-import database dari file `reservasi_ruangan.sql`.
-* **Hasil Akhir**: Aplikasi dapat diakses publik melalui browser di port **8083**.
+### 7. Tugas 3 - Aplikasi Reservasi Ruangan (HAProxy Load Balancer + 2 Webservers + 1 Database)
+* **Kisah & Tujuan**: Deployment aplikasi reservasi ruangan rapat dan fasilitas hotel ([paknux/appReservasi](https://github.com/paknux/appReservasi)) dengan arsitektur *High Availability & Load Balancing*.
+* **Arsitektur (Total 4 Kontainer)**:
+  - **`haproxy`**: Load balancer / reverse proxy publik (`haproxy:latest`) yang menerima trafik HTTP di port **8083** dan membagi beban ke backend dengan algoritma `roundrobin`.
+  - **`webserver1`**: Kontainer Apache + PHP 8.2 + PDO MySQL (port 80 internal).
+  - **`webserver2`**: Kontainer Apache + PHP 8.2 + PDO MySQL (port 80 internal) menggunakan image yang sama.
+  - **`dbserver`**: Database `mariadb:11-jammy` (port 3306 internal) dengan volume persistent `db_data` dan auto-import `reservasi_ruangan.sql`.
+* **Hasil Akhir**: Akses publik aman satu pintu melalui HAProxy di port **8083**, beban trafik didistribusikan bergantian ke `webserver1` dan `webserver2`.
 
 ---
 
@@ -111,7 +115,15 @@ Anda dapat memilih tugas mana yang ingin dibuatkan server EC2-nya secara otomati
 ```bash
 python main.py create --tugas3
 ```
-Skrip akan membuat EC2 bernama `tugas-3-reservasi`, menginstal Docker, meng-clone repositori, menyiapkan `Dockerfile` & `docker-compose.yml`, melakukan import SQL, dan menguji hingga HTTP 200 OK.
+Skrip akan membuat EC2 bernama `tugas-3-reservasi`, menginstal Docker, meng-clone repositori, menyiapkan `Dockerfile`, `haproxy.cfg`, dan `docker-compose.yml`, melakukan import SQL, dan menjalankan 4 kontainer (HAProxy, 2 webservers, dan 1 MariaDB) hingga teruji HTTP 200 OK.
+
+> [!TIP]
+> **Memperbarui Instance Tugas 3 yang Sudah Berjalan Tanpa Buat EC2 Baru:**
+> Jika EC2 `tugas-3-reservasi` sudah aktif dan Anda ingin memperbarui atau menerapkan arsitektur HAProxy secara instan:
+> ```bash
+> python main.py update --tugas3
+> ```
+
 
 #### Ingin Menjalankan Tugas 2 (Aplikasi ID Card)?
 ```bash

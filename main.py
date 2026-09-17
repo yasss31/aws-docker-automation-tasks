@@ -288,6 +288,134 @@ def cmd_status(args):
 def cmd_inspect(args):
     inspect_all()
 
+def cmd_update(args):
+    if getattr(args, "tugas3", False):
+        logger.info("=== UPDATE DEPLOYMENT TUGAS 3: HAPROXY LOAD BALANCER ===")
+        session = get_session()
+        ssm = session.client("ssm")
+        instances = get_instances_status(task_filter="tugas3")
+        if not instances:
+            logger.error("Tidak ada instance Tugas 3 yang aktif. Jalankan 'python main.py create --tugas3' terlebih dahulu.")
+            sys.exit(1)
+
+        instance_id = instances[0]["instance_id"]
+        pub_ip = instances[0]["public_ip"]
+        logger.info(f"Mengirimkan pembaruan HAProxy ke instance {instance_id} ({pub_ip})...")
+
+        commands = [
+            "cd /home/ubuntu/appReservasi",
+            "cat << 'EOF' > haproxy.cfg\n"
+            "global\n"
+            "    log stdout format raw local0\n\n"
+            "defaults\n"
+            "    log global\n"
+            "    mode http\n"
+            "    option httplog\n"
+            "    timeout connect 5s\n"
+            "    timeout client 30s\n"
+            "    timeout server 30s\n\n"
+            "resolvers docker_dns\n"
+            "    nameserver dns 127.0.0.11:53\n"
+            "    resolve_retries 3\n"
+            "    timeout retry 1s\n"
+            "    hold valid 10s\n\n"
+            "frontend http_front\n"
+            "    bind *:8080\n"
+            "    default_backend web_servers\n\n"
+            "backend web_servers\n"
+            "    balance roundrobin\n"
+            "    option httpchk GET /\n"
+            "    server webserver1 webserver1:80 check resolvers docker_dns init-addr libc,none\n"
+            "    server webserver2 webserver2:80 check resolvers docker_dns init-addr libc,none\n"
+            "EOF",
+            "cat << 'EOF' > docker-compose.yml\n"
+            "services:\n"
+            "  haproxy:\n"
+            "    image: haproxy:latest\n"
+            "    container_name: haproxy\n"
+            "    ports:\n"
+            "      - \"8083:8080\"\n"
+            "    volumes:\n"
+            "      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro\n"
+            "    depends_on:\n"
+            "      - webserver1\n"
+            "      - webserver2\n"
+            "    networks:\n"
+            "      - reservasi_net\n"
+            "    restart: unless-stopped\n\n"
+            "  webserver1:\n"
+            "    build:\n"
+            "      context: .\n"
+            "      dockerfile: Dockerfile\n"
+            "    image: appreservasi-webserver:latest\n"
+            "    container_name: webserver1\n"
+            "    expose:\n"
+            "      - \"80\"\n"
+            "    volumes:\n"
+            "      - ./:/var/www/html\n"
+            "    depends_on:\n"
+            "      - dbserver\n"
+            "    networks:\n"
+            "      - reservasi_net\n"
+            "    restart: unless-stopped\n\n"
+            "  webserver2:\n"
+            "    image: appreservasi-webserver:latest\n"
+            "    container_name: webserver2\n"
+            "    expose:\n"
+            "      - \"80\"\n"
+            "    volumes:\n"
+            "      - ./:/var/www/html\n"
+            "    depends_on:\n"
+            "      - dbserver\n"
+            "    networks:\n"
+            "      - reservasi_net\n"
+            "    restart: unless-stopped\n\n"
+            "  dbserver:\n"
+            "    image: mariadb:11-jammy\n"
+            "    container_name: dbserver\n"
+            "    environment:\n"
+            "      MARIADB_ROOT_PASSWORD: root123\n"
+            "      MARIADB_DATABASE: db_reservasi_ruangan\n"
+            "    volumes:\n"
+            "      - db_data:/var/lib/mysql\n"
+            "      - ./reservasi_ruangan.sql:/docker-entrypoint-initdb.d/reservasi_ruangan.sql:ro\n"
+            "    networks:\n"
+            "      - reservasi_net\n"
+            "    restart: unless-stopped\n\n"
+            "networks:\n"
+            "  reservasi_net:\n"
+            "    driver: bridge\n\n"
+            "volumes:\n"
+            "  db_data:\n"
+            "EOF",
+            "docker pull haproxy:latest",
+            "docker rm -f webserver 2>/dev/null || true",
+            "docker compose up -d --build --remove-orphans",
+            "sleep 5",
+            "docker compose ps"
+        ]
+
+        res = ssm.send_command(
+            InstanceIds=[instance_id],
+            DocumentName="AWS-RunShellScript",
+            Parameters={"commands": commands}
+        )
+        cmd_id = res["Command"]["CommandId"]
+        logger.info(f"Perintah pembaruan dikirim (Command ID: {cmd_id}). Menunggu hasil...")
+
+        for _ in range(25):
+            time.sleep(2)
+            inv = ssm.get_command_invocation(CommandId=cmd_id, InstanceId=instance_id)
+            if inv.get("Status") in ["Success", "Failed"]:
+                break
+
+        print("\nHASIL PEMBARUAN CONTAINER DOCKER COMPOSE:")
+        print(inv.get("StandardOutputContent", ""))
+        logger.info(f"Pembaruan Tugas 3 Selesai! Layanan aktif di http://{pub_ip}:8083 (via HAProxy)")
+    else:
+        logger.error("Gunakan flag --tugas3 untuk pembaruan.")
+        sys.exit(1)
+
 def cmd_terminate(args):
     is_tugas2 = getattr(args, "tugas2", False)
     is_tugas3 = getattr(args, "tugas3", False)
@@ -328,6 +456,12 @@ def main():
     group_status.add_argument("--tugas3", action="store_true", help="Filter khusus instance Tugas 3")
     sub_status.set_defaults(func=cmd_status)
 
+    # Update (Re-apply or upgrade deployment on live instance)
+    sub_update = subparsers.add_parser("update", help="Memperbarui deployment pada instance yang sedang aktif tanpa membuat EC2 baru")
+    group_update = sub_update.add_mutually_exclusive_group(required=True)
+    group_update.add_argument("--tugas3", action="store_true", help="Update deployment Tugas 3 ke arsitektur HAProxy (4 kontainer: haproxy, webserver1, webserver2, dbserver)")
+    sub_update.set_defaults(func=cmd_update)
+
     # Inspect (Diagnosa Dalam Server)
     sub_insp = subparsers.add_parser("inspect", help="Diagnosa mendalam runtime server (HTTP, status.json, kontainer docker)")
     sub_insp.set_defaults(func=cmd_inspect)
@@ -340,6 +474,7 @@ def main():
     group_term.add_argument("--tugas2", action="store_true", help="Terminate khusus instance Tugas 2")
     group_term.add_argument("--tugas3", action="store_true", help="Terminate khusus instance Tugas 3")
     sub_term.set_defaults(func=cmd_terminate)
+
 
 
     args = parser.parse_args()

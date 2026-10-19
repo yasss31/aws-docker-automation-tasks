@@ -1,14 +1,14 @@
-# AWS Docker Automation Tasks 🚀
+# AWS Docker & Docker Swarm Automation Tasks 🚀
 
-Selamat datang di repository **AWS Docker Automation Tasks**! Repository ini dirancang khusus untuk mempermudah siapa saja—termasuk **pemula yang baru belajar cloud computing dan Docker**—dalam mempraktikkan kontainerisasi aplikasi secara otomatis di atas infrastruktur cloud **Amazon Web Services (AWS EC2)**.
+Selamat datang di repository **AWS Docker & Docker Swarm Automation Tasks**! Repository ini dirancang khusus untuk mempermudah siapa saja—termasuk **pemula yang baru belajar cloud computing, Docker, dan DevOps**—dalam mempraktikkan kontainerisasi dan orkestrasi aplikasi secara otomatis di atas infrastruktur cloud **Amazon Web Services (AWS EC2 & AWS Academy Learner Lab)**.
 
-Proyek ini menyatukan seluruh modul praktikum **LKPD 1 hingga LKPD 5** serta **Tugas Deployment Aplikasi (Tugas 2 & Tugas 3)** ke dalam satu framework CLI berbasis **Python (Boto3)** dan **Cloud-Init (User Data)**.
+Proyek ini menyatukan seluruh modul praktikum **LKPD 1 hingga LKPD 8** (Dasar Docker, Multi-Container, Dockerfile, Docker Hub, Docker Compose, serta **Docker Swarm Single-Node & Multi-Node Cluster**) dan **Tugas Aplikasi Produksi (Tugas 2 App ID Card & Tugas 3 HAProxy Load Balancing)** ke dalam satu framework CLI otomasi terpadu berbasis **Python (Boto3)**, **Cloud-Init (User Data)**, dan **Modular Shell Scripts**.
 
 ---
 
 ## 📚 Modul & Lembar Kerja Peserta Didik (LKPD)
 
-Seluruh dokumen materi panduan resmi tersedia dalam format PDF di folder [`docs/pdf/`](docs/pdf/). Berikut adalah penjelasan cerita dan kompetensi di balik setiap modul:
+Seluruh dokumen materi panduan resmi tersedia dalam format PDF di folder [`docs/pdf/`](docs/pdf/). Laporan praktikum komprehensif tersedia di folder [`docs/reports/`](docs/reports/). Berikut adalah penjelasan cerita dan kompetensi di balik setiap modul:
 
 ### 1. [LKPD 1 - Dasar Docker dan Web Server HTTP](docs/pdf/LKPD%201%20-%20Dasar%20Docker.pdf)
 * **Kisah & Tujuan**: Memulai langkah pertama di dunia kontainer. Anda diajak memahami arsitektur daemon Docker pada Linux Ubuntu, perintah lifecycle kontainer (`pull`, `run`, `ps`, `stop`, `rm`), teknik port binding (`-p 8080:80`), dan volume mounting dari host ke kontainer (`-v /var/mywww:/var/www/html`).
@@ -46,6 +46,25 @@ Seluruh dokumen materi panduan resmi tersedia dalam format PDF di folder [`docs/
   - **`webserver2`**: Kontainer Apache + PHP 8.2 + PDO MySQL (port 80 internal) menggunakan image yang sama.
   - **`dbserver`**: Database `mariadb:11-jammy` (port 3306 internal) dengan volume persistent `db_data` dan auto-import `reservasi_ruangan.sql`.
 * **Hasil Akhir**: Akses publik aman satu pintu melalui HAProxy di port **8083**, beban trafik didistribusikan bergantian ke `webserver1` dan `webserver2`.
+* **Dokumentasi & Tutorial Lengkap**: Lihat panduan artikel Medium di [`docs/articles/TUGAS_3_MEDIUM_ARTICLE.md`](docs/articles/TUGAS_3_MEDIUM_ARTICLE.md).
+
+### 8. [LKPD 6 - Pengantar Konsep Docker Swarm (Multi-Node Cluster)](docs/pdf/LKPD%206%20-%20Pengantar%20Konsep%20Docker%20Swarm.pdf)
+* **Kisah & Tujuan**: Mengelola kontainer pada skala multi-server membutuhkan orkestrator tangguh. Pada LKPD 6, kita membangun klaster 2-node di atas AWS EC2: **1 Manager Node** dan **1 Worker Node**.
+* **Konsep Kunci**: Inisialisasi Swarm (`docker swarm init`), worker joining via token (`docker swarm join --token ...`), pembuatan service dengan multi-replika (`docker service create --replicas 3`), horizontal scaling (`docker service scale web=5`), serta pembuktian kemampuan pemulihan mandiri (**self-healing**) saat kontainer dihentikan paksa.
+* **Hasil Akhir & Laporan**: Klaster aktif teruji fault-tolerant di port **8080**. Baca selengkapnya di [`docs/reports/LKPD_6_DOCKER_SWARM_REPORT.md`](docs/reports/LKPD_6_DOCKER_SWARM_REPORT.md).
+
+### 9. [LKPD 7 - Docker Swarm Single Node & Deployment appKantin](docs/pdf/LKPD%207%20-%20Docker%20Swarm%20Single%20Node.pdf)
+* **Kisah & Tujuan**: Memahami orkestrasi internal Swarm pada single host: ingress routing mesh, persistent bind mounts, multi-replika PHP Nginx (`trafex/php-nginx`), serta integrasi dengan kontainer database MariaDB untuk aplikasi nyata **appKantin** ([paknux/appKantin](https://github.com/paknux/appKantin)).
+* **Konsep Kunci**: Port routing mesh internal 8080:8080, pembagian trafik round-robin antar replika, konfigurasi otomatis `config/db.php`, dan impor database menu kantin.
+* **Hasil Akhir & Laporan**: Aplikasi appKantin melayani di port **8080** dengan database terhubung. Baca selengkapnya di [`docs/reports/LKPD_7_DOCKER_SWARM_REPORT.md`](docs/reports/LKPD_7_DOCKER_SWARM_REPORT.md).
+
+### 10. [LKPD 8 - Docker Swarm 3 Node Cluster & Dedicated MariaDB di AWS Academy](docs/pdf/LKPD%208%20-%20Docker%20Swarm%203%20Node%20AWS%20Academy.pdf)
+* **Kisah & Tujuan**: Standar industri memisahkan layer stateless (aplikasi web klaster) dan layer stateful (database server terisolasi). Di LKPD 8, kita mengorkestrasi **4 instance EC2 Ubuntu 24.04** di AWS Academy Learner Lab:
+  - **1 Swarm Manager** (`swarm-manager`)
+  - **2 Swarm Workers** (`swarm-worker1`, `swarm-worker2`)
+  - **1 Dedicated Database Server** (`swarm-db` MariaDB 11.8)
+* **Fitur Utama**: Ingress Routing Mesh round-robin lintas node fisik, uji ketahanan node maintenance dengan `docker node update --availability drain`, deployment deklaratif via **Docker Stack** ([`kantin-stack.yml`](kantin-stack.yml)), dan verifikasi koneksi SQL via private IP AWS VPC.
+* **Hasil Akhir & Laporan**: Klaster 3-node enterprise-ready melayani di port **8080**. Baca selengkapnya di [`docs/reports/LKPD_8_DOCKER_SWARM_REPORT.md`](docs/reports/LKPD_8_DOCKER_SWARM_REPORT.md).
 
 ---
 
@@ -90,6 +109,21 @@ pip install -r requirements.txt
 
 ---
 
+### 🩺 Langkah 2.1: Audit & Diagnosa Kredensial Otomatis (AWS Doctor)
+Jika Anda baru memperbarui kredensial dari Cloud Labs / AWS Academy atau ingin memastikan AWS CLI, boto3, region `us-east-1`, serta izin IAM/SSM sinkron dan sehat tanpa mengganggu server yang sedang berjalan:
+```bash
+python main.py aws-doctor --repair --verify
+```
+Fitur ini akan:
+1. **Audit Mendalam**: Memeriksa konsistensi antara `~/.aws/credentials`, `.env` proyek, dan environment variables.
+2. **Safe Auto-Repair**: Menyelaraskan region `us-east-1` dan menyinkronkan kredensial yang valid dengan backup otomatis (`.bak`), tanpa menimpa variabel proyek lainnya.
+3. **Keamanan File Kunci SSH**: Mengamankan izin ACL NTFS file private key (`vockey.pem` dan `labsuser.pem`) ke `Read-Only` khusus akun user.
+4. **Validasi Izin API**: Menguji izin STS, EC2, SSM, dan IAM (`LabInstanceProfile`).
+5. **Audit Runtime EC2 & SSM**: Membedakan masalah kredensial lokal dari masalah IAM Instance Profile, SSM Agent offline, atau jaringan.
+6. **Live Verification**: Menguji eksekusi remote command ke instance aktif melalui AWS Systems Manager.
+
+---
+
 ### Langkah 3: Melakukan Pre-Flight Validation
 Sebelum membuat mesin EC2 nyata di cloud, jalankan validasi otomatis untuk memastikan akun AWS dan konfigurasi sudah valid:
 ```bash
@@ -130,13 +164,37 @@ Skrip akan membuat EC2 bernama `tugas-3-reservasi`, menginstal Docker, meng-clon
 python main.py create --tugas2
 ```
 
-#### Ingin Menjalankan Salah Satu LKPD (Misal LKPD 1)?
+#### Ingin Menjalankan Docker Swarm 3 Node + MariaDB Standalone (LKPD 8)?
+```bash
+python run_lkpd8.py
+# Atau jalankan otomasi penuh sekali perintah:
+python run_lkpd8.py --all
+# Atau melalui CLI utama:
+python main.py create --lkpd 8
+```
+*(Menyiapkan klaster 3 node Swarm: 1 Manager + 2 Worker, serta 1 EC2 terpisah untuk MariaDB 11.8, routing mesh round-robin, dan deployment appKantin via Docker Stack)*.
+
+#### Ingin Menjalankan Docker Swarm Single Node (LKPD 7)?
+```bash
+python run_lkpd7.py
+# Atau melalui CLI utama:
+python main.py create --lkpd 7
+```
+
+#### Ingin Menjalankan Docker Swarm Multi-Node (LKPD 6)?
+```bash
+python run_lkpd6.py
+# Atau melalui CLI utama:
+python main.py create --swarm
+```
+
+#### Ingin Menjalankan Salah Satu LKPD Standalone (Misal LKPD 1)?
 ```bash
 python main.py create --lkpd 1
 ```
 *(Ganti angka `1` dengan nomor LKPD `2`, `3`, `4`, atau `5` sesuai kebutuhan)*.
 
-#### Ingin Menjalankan Seluruh LKPD 1 s.d. 5 Sekaligus?
+#### Ingin Menjalankan Seluruh LKPD Sekaligus?
 ```bash
 python main.py create --all
 ```
@@ -199,18 +257,21 @@ python main.py create --all
 
 ## 🛡️ Port Mapping & Keamanan Jaringan
 
-Security Group (`lkpd-docker-sg`) secara otomatis dikonfigurasi oleh sistem:
+Security Group (`lkpd-docker-sg` & `swarm-sg`) secara otomatis dikonfigurasi oleh sistem:
 
 | Port | Protokol | Akses | Peruntukan |
 |:---:|:---:|:---:|---|
 | **22** | TCP | Publik (`0.0.0.0/0`) | Akses Terminal Remote via SSH |
 | **80** / **443** | TCP | Publik (`0.0.0.0/0`) | Standar Web HTTP / HTTPS |
-| **8080** | TCP | Publik (`0.0.0.0/0`) | LKPD 1 (Docker HTTP) & Tugas 2 (App ID Card) |
+| **8080** | TCP | Publik (`0.0.0.0/0`) | LKPD 1 (Docker HTTP), Tugas 2 (App ID Card), LKPD 6, 7, 8 (Docker Swarm Ingress) |
 | **8088** | TCP | Publik (`0.0.0.0/0`) | LKPD 2 (Multi-Container) & LKPD 5 (Docker Compose) |
 | **8001** | TCP | Publik (`0.0.0.0/0`) | LKPD 3 (Custom Image Dockerfile) |
 | **8002** | TCP | Publik (`0.0.0.0/0`) | LKPD 4 (Docker Hub Image) |
-| **8083** | TCP | Publik (`0.0.0.0/0`) | Tugas 3 (Aplikasi Reservasi Ruangan) |
-| **3306** | TCP | Internal / Opsional | MariaDB / MySQL Database Server |
+| **8083** | TCP | Publik (`0.0.0.0/0`) | Tugas 3 (HAProxy Load Balancer ke 2 Webservers) |
+| **2377** | TCP | Internal Klaster | Docker Swarm Cluster Management Communication |
+| **7946** | TCP/UDP | Internal Klaster | Docker Swarm Node-to-Node Discovery |
+| **4789** | UDP | Internal Klaster | Docker Swarm Overlay Network Traffic (Ingress Mesh) |
+| **3306** | TCP | Internal / VPC | MariaDB / MySQL Dedicated Database Server |
 
 ---
 
@@ -219,34 +280,64 @@ Security Group (`lkpd-docker-sg`) secara otomatis dikonfigurasi oleh sistem:
 ```text
 aws-docker-automation-tasks/
 ├── docs/
-│   └── pdf/               # Lembar Kerja Peserta Didik (LKPD 1 s.d. 5 PDF)
-│       ├── LKPD 1 - Dasar Docker.pdf
-│       ├── LKPD 2 - Deploy App Multi Container.pdf
-│       ├── LKPD 3 - Dockerfile.pdf
-│       ├── LKPD 4 - Publikasi Docker Image ke Docker Hub.pdf
-│       └── LKPD 5 - Docker Compose.pdf
+│   ├── pdf/               # Panduan Resmi LKPD 1 s.d. 8 (PDF)
+│   │   ├── LKPD 1 - Dasar Docker.pdf
+│   │   ├── LKPD 2 - Deploy App Multi Container.pdf
+│   │   ├── LKPD 3 - Dockerfile.pdf
+│   │   ├── LKPD 4 - Publikasi Docker Image ke Docker Hub.pdf
+│   │   ├── LKPD 5 - Docker Compose.pdf
+│   │   ├── LKPD 6 - Pengantar Konsep Docker Swarm.pdf
+│   │   ├── LKPD 7 - Docker Swarm Single Node.pdf
+│   │   └── LKPD 8 - Docker Swarm 3 Node AWS Academy.pdf
+│   ├── reports/           # Laporan Praktikum Komprehensif Markdown
+│   │   ├── LKPD_6_DOCKER_SWARM_REPORT.md
+│   │   ├── LKPD_7_DOCKER_SWARM_REPORT.md
+│   │   └── LKPD_8_DOCKER_SWARM_REPORT.md
+│   └── articles/          # Publikasi Tutorial Arsitektur & Artikel Medium
+│       ├── TUGAS_3_MEDIUM_ARTICLE.md
+│       ├── infra tugas 3.png
+│       └── topologi_tugas3.png
 ├── aws/                   # Modul SDK AWS Boto3
 │   ├── ami.py             # SSM Parameter Store AMI Resolver
 │   ├── diagnostics.py     # Live Runtime Inspector (HTTP & SSM Logs)
+│   ├── doctor.py          # AWS Doctor (Kredensial, STS, EC2, SSM, Auto-Repair)
 │   ├── ec2.py             # EC2 Management (Run, Describe, Terminate)
-│   └── network.py         # VPC, Subnet, dan Security Group Rule Sync
+│   └── network.py         # VPC, Subnet, dan Security Group Rule Sync (Self-Referencing SG)
 ├── config/
-│   └── settings.py        # Environment Configuration Loader
+│   └── settings.py        # Environment Configuration Loader & Dynamic Reloader
 ├── lkpd/                  # Controllers Modul LKPD & Tugas
 │   ├── base.py            # Base abstract class & template renderer
 │   ├── lkpd1.py s.d lkpd5.py
+│   ├── lkpd6.py           # Controller Swarm Multi-Node (Manager + Worker)
+│   ├── lkpd7.py           # Controller Swarm Single-Node (AppKantin)
+│   ├── lkpd8.py           # Orchestrator Swarm 3-Node Cluster + Dedicated MariaDB
 │   ├── tugas2.py          # Controller Tugas 2 (App ID Card)
-│   └── tugas3.py          # Controller Tugas 3 (App Reservasi Ruangan)
+│   └── tugas3.py          # Controller Tugas 3 (App Reservasi + HAProxy)
+├── scripts/               # Modular Shell Execution Scripts
+│   ├── lkpd7/             # Script Otomasi LKPD 7 (01 s.d. 07)
+│   ├── lkpd8/             # Script Otomasi LKPD 8 (01 s.d. 09)
+│   ├── setup_manager.sh   # Helper Inisialisasi Swarm Manager
+│   ├── setup_worker.sh    # Helper Join Swarm Worker
+│   ├── create_service.sh  # Helper Deployment Service Swarm
+│   ├── scale_service.sh   # Helper Scaling Service Replicas
+│   └── test_self_healing.sh
 ├── templates/             # Script UserData Cloud-Init
 │   ├── bootstrap.sh       # Inisialisasi dependensi & health helper
 │   ├── lkpd1.sh s.d lkpd5.sh
+│   ├── lkpd6_manager.sh / lkpd6_worker.sh
+│   ├── lkpd7.sh
+│   ├── lkpd8_manager.sh / lkpd8_worker.sh / lkpd8_db.sh
 │   ├── tugas2_idcard.sh   # Script otomasi Tugas 2
-│   └── tugas3_reservasi.sh# Script otomasi Tugas 3
+│   └── tugas3_reservasi.sh# Script otomasi Tugas 3 (HAProxy Multi-Backend)
 ├── output/                # Artefak lokal hasil eksekusi (summary.json)
+├── kantin-stack.yml       # Docker Stack Compose Specification (Tantangan LKPD 8)
+├── main.py                # File utama (CLI Entrypoint Lengkap)
+├── run_lkpd6.py           # Standalone Interactive Runner LKPD 6
+├── run_lkpd7.py           # Standalone Interactive Runner LKPD 7
+├── run_lkpd8.py           # Standalone Interactive Runner LKPD 8
+├── requirements.txt       # Daftar pustaka Python
 ├── .env.example           # Template kredensial tanpa rahasia
 ├── .gitignore             # Proteksi berkas sensitif (.env, .pem, dsb.)
-├── main.py                # File utama (CLI Entrypoint)
-├── requirements.txt       # Daftar pustaka Python
 └── README.md              # Dokumentasi lengkap proyek
 ```
 

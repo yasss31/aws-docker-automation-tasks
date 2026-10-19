@@ -29,6 +29,13 @@ class BaseLKPD(ABC):
                 env_exports.append(f'export {k}="{escaped_v}"')
         env_block = "\n".join(env_exports)
 
+        # Bersihkan duplicate shebang dari template_content
+        lines = template_content.splitlines()
+        if lines and lines[0].startswith("#!"):
+            template_body = "\n".join(lines[1:])
+        else:
+            template_body = template_content
+
         # Injeksi User Data: Membuat /opt/lkpd/bootstrap.sh dulu, baru run.sh
         full_user_data = f"""#!/bin/bash
 mkdir -p /opt/lkpd
@@ -39,11 +46,12 @@ BOOTSTRAP_EOF
 chmod +x /opt/lkpd/bootstrap.sh
 
 cat << 'RUNNER_EOF' > /opt/lkpd/run.sh
+#!/bin/bash
 {env_block}
-{template_content}
+{template_body}
 RUNNER_EOF
 chmod +x /opt/lkpd/run.sh
 
-/opt/lkpd/run.sh
+/bin/bash /opt/lkpd/run.sh
 """
         return full_user_data

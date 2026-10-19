@@ -132,6 +132,7 @@ def get_instances_status(lkpd_filter: int = None, task_filter: str = None) -> li
                 "instance_id": inst["InstanceId"],
                 "state": inst["State"]["Name"],
                 "public_ip": inst.get("PublicIpAddress", "-"),
+                "private_ip": inst.get("PrivateIpAddress", "-"),
                 "launch_time": str(inst["LaunchTime"])
             })
     results.sort(key=lambda x: str(x.get("name", "")))

@@ -25,7 +25,7 @@ class Settings:
     SECURITY_GROUP_NAME = os.getenv('SECURITY_GROUP_NAME', 'sg-lkpd-docker').strip()
 
     # SG Rules
-    SG_RULES_RAW = os.getenv('SG_RULES', '22:0.0.0.0/0,80:0.0.0.0/0,443:0.0.0.0/0,7070:0.0.0.0/0,8080:0.0.0.0/0,8001:0.0.0.0/0,8002:0.0.0.0/0,8088:0.0.0.0/0,3306:0.0.0.0/0').strip()
+    SG_RULES_RAW = os.getenv('SG_RULES', '22:0.0.0.0/0,80:0.0.0.0/0,443:0.0.0.0/0,2377:0.0.0.0/0,7946:0.0.0.0/0,7070:0.0.0.0/0,8080:0.0.0.0/0,8083:0.0.0.0/0,8001:0.0.0.0/0,8002:0.0.0.0/0,8088:0.0.0.0/0,3306:0.0.0.0/0').strip()
 
     # Project
     PROJECT_NAME = os.getenv('PROJECT_NAME', 'aws-lkpd-automation').strip()
@@ -56,4 +56,25 @@ class Settings:
                 rules.append((int(port_str.strip()), cidr.strip()))
         return rules
 
+    @classmethod
+    def reload(cls):
+        load_dotenv(override=True)
+        cls.AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+        cls.AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '').strip()
+        cls.AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '').strip()
+        cls.AWS_SESSION_TOKEN = os.getenv('AWS_SESSION_TOKEN', '').strip()
+        cls.EC2_AMI_ID = os.getenv('EC2_AMI_ID', '').strip()
+        cls.EC2_AMI_ARCHITECTURE = os.getenv('EC2_AMI_ARCHITECTURE', 'x86_64').strip()
+        cls.EC2_INSTANCE_TYPE = os.getenv('EC2_INSTANCE_TYPE', 't3.small').strip()
+        cls.EC2_KEY_NAME = os.getenv('EC2_KEY_NAME', 'vockey').strip()
+        cls.EC2_IAM_INSTANCE_PROFILE = os.getenv('EC2_IAM_INSTANCE_PROFILE', 'lab instance profile').strip()
+        cls.VPC_ID = os.getenv('VPC_ID', '').strip()
+        cls.SUBNET_ID = os.getenv('SUBNET_ID', '').strip()
+        cls.SECURITY_GROUP_ID = os.getenv('SECURITY_GROUP_ID', '').strip()
+        cls.SECURITY_GROUP_NAME = os.getenv('SECURITY_GROUP_NAME', 'sg-lkpd-docker').strip()
+        cls.SG_RULES_RAW = os.getenv('SG_RULES', '22:0.0.0.0/0,80:0.0.0.0/0,443:0.0.0.0/0,2377:0.0.0.0/0,7946:0.0.0.0/0,7070:0.0.0.0/0,8080:0.0.0.0/0,8083:0.0.0.0/0,8001:0.0.0.0/0,8002:0.0.0.0/0,8088:0.0.0.0/0,3306:0.0.0.0/0').strip()
+        cls.PROJECT_NAME = os.getenv('PROJECT_NAME', 'aws-lkpd-automation').strip()
+        cls.KEEP_INSTANCES = os.getenv('KEEP_INSTANCES', 'true').strip().lower() in ('true', '1', 'yes')
+
 settings = Settings()
+

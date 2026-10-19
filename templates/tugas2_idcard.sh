@@ -86,6 +86,11 @@ retry_cmd 3 3 docker compose up -d || {
     exit 1
 }
 
+# Pastikan ekstensi PHP MySQL / mysqli aktif di container webserver
+echo "[SETUP] Memastikan modul php-mysql / mysqli aktif di container idcard-web..."
+docker exec idcard-web bash -c "php -m | grep -qi mysqli || (apt update && DEBIAN_FRONTEND=noninteractive apt install -y php-mysqli php-mysql && apache2ctl graceful)" || true
+
+
 # 6. Menunggu kesiapan database MariaDB
 update_status "${TASK_NAME}" "in_progress" "wait_db" "Menunggu MariaDB di container dbserver siap melayani query"
 DB_READY=false

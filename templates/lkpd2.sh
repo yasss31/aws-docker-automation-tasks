@@ -63,9 +63,12 @@ echo "Menunggu service MariaDB siap menerima query..."
 DB_READY=false
 for i in {1..40}; do
     if docker exec dbserver mariadb -u root -ppass123 -e "SELECT 1;" &>/dev/null; then
-        DB_READY=true
-        echo "MariaDB dbserver siap dan menerima koneksi!"
-        break
+        sleep 2
+        if docker exec dbserver mariadb -u root -ppass123 -e "SELECT 1;" &>/dev/null; then
+            DB_READY=true
+            echo "MariaDB dbserver siap dan menerima koneksi!"
+            break
+        fi
     fi
     echo "[MariaDB Check $i/40] Menunggu database siap..."
     sleep 3
@@ -77,8 +80,8 @@ if [ "$DB_READY" != true ]; then
     exit 1
 fi
 
-# Buat database toko_db
-docker exec dbserver mariadb -u root -ppass123 -e "CREATE DATABASE IF NOT EXISTS toko_db;" || {
+# Buat database toko_db dengan retry
+retry_cmd 10 3 docker exec dbserver mariadb -u root -ppass123 -e "CREATE DATABASE IF NOT EXISTS toko_db;" || {
     update_status ${LKPD_NUM} "failed" "db_create_failed" "Gagal membuat database toko_db"
     exit 1
 }

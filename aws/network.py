@@ -120,3 +120,17 @@ def sync_sg_rules(ec2, sg_id: str):
             if "InvalidPermission.Duplicate" not in str(e):
                 logger.warning(f"Catatan sinkronisasi SG Rule port {port}: {e}")
 
+    # Allow all internal traffic within SG for Swarm overlay / multi-node cluster
+    try:
+        ec2.authorize_security_group_ingress(
+            GroupId=sg_id,
+            IpPermissions=[{
+                "IpProtocol": "-1",
+                "UserIdGroupPairs": [{"GroupId": sg_id, "Description": "All internal traffic within SG for Swarm"}]
+            }]
+        )
+        logger.info(f"Berhasil menambahkan self-referencing SG rule untuk komunikasi klaster Swarm.")
+    except ClientError as e:
+        if "InvalidPermission.Duplicate" not in str(e):
+            logger.warning(f"Catatan sinkronisasi internal SG Rule: {e}")
+

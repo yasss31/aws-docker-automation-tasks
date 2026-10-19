@@ -25,6 +25,9 @@ from lkpd.lkpd2 import LKPD2
 from lkpd.lkpd3 import LKPD3
 from lkpd.lkpd4 import LKPD4
 from lkpd.lkpd5 import LKPD5
+from lkpd.lkpd6 import LKPD6Manager, LKPD6Worker, SwarmClusterOrchestrator
+from lkpd.lkpd7 import LKPD7, SwarmSingleNodeOrchestrator
+from lkpd.lkpd8 import LKPD8, Swarm3NodeClusterOrchestrator
 from lkpd.tugas2 import Tugas2
 from lkpd.tugas3 import Tugas3
 
@@ -40,7 +43,10 @@ LKPD_MAP = {
     2: LKPD2,
     3: LKPD3,
     4: LKPD4,
-    5: LKPD5
+    5: LKPD5,
+    6: LKPD6Manager,
+    7: LKPD7,
+    8: LKPD8
 }
 
 def cmd_validate(args):
@@ -204,6 +210,52 @@ def deploy_tugas3(ami_id: str, subnet_id: str, sg_id: str) -> dict:
     }
     return result
 
+def deploy_swarm(ami_id: str, subnet_id: str, sg_id: str) -> list:
+    orchestrator = SwarmClusterOrchestrator()
+    res = orchestrator.run_full_automation(ami_id, subnet_id, sg_id)
+    mgr = res["infra"]["manager"]
+    wrk = res["infra"]["worker"]
+    return [
+        {
+            "lkpd": 6,
+            "name": "lkpd-6-swarm-manager",
+            "instance_id": mgr["instance_id"],
+            "public_ip": mgr["public_ip"],
+            "port": 8080,
+            "url": mgr["url"],
+            "status": "cluster_ready"
+        },
+        {
+            "lkpd": 6,
+            "name": "lkpd-6-swarm-worker",
+            "instance_id": wrk["instance_id"],
+            "public_ip": wrk["public_ip"],
+            "port": 8080,
+            "url": wrk["url"],
+            "status": "cluster_ready"
+        }
+    ]
+
+def deploy_lkpd8_cluster(ami_id: str, subnet_id: str, sg_id: str) -> list:
+    orchestrator = Swarm3NodeClusterOrchestrator()
+    vpc_id, _ = resolve_default_vpc_and_subnet()
+    sg_swarm = orchestrator.resolve_or_create_sg_swarm(vpc_id)
+    cluster = orchestrator.deploy_infrastructure(ami_id, subnet_id, sg_swarm)
+    orchestrator.init_swarm_cluster(cluster)
+    orchestrator.setup_web_service(cluster)
+    results = []
+    for k, v in cluster.items():
+        results.append({
+            "lkpd": 8,
+            "name": f"swarm-{k}",
+            "instance_id": v["instance_id"],
+            "public_ip": v.get("public_ip"),
+            "port": 8080 if k != "db" else 3306,
+            "url": f"http://{v.get('public_ip')}:8080" if k != "db" else f"mysql://{v.get('public_ip')}:3306",
+            "status": "cluster_member"
+        })
+    return results
+
 def cmd_create(args):
     logger.info("Menyiapkan resource jaringan dan AMI dasar...")
     vpc_id, subnet_id = resolve_default_vpc_and_subnet()
@@ -223,17 +275,36 @@ def cmd_create(args):
         logger.info("Memulai pembuatan instance khusus Tugas 2 (App ID Card)...")
         res = deploy_tugas2(ami_id, subnet_id, sg_id)
         results.append(res)
+    elif getattr(args, "swarm", False) or args.lkpd == 6:
+        logger.info("Memulai pembuatan Docker Swarm Cluster (LKPD 6: 2 EC2 - Manager & Worker)...")
+        res_swarm = deploy_swarm(ami_id, subnet_id, sg_id)
+        results.extend(res_swarm)
     elif args.all:
-        logger.info("Memulai pembuatan seluruh 5 LKPD secara berurutan...")
+        logger.info("Memulai pembuatan seluruh LKPD secara berurutan...")
         for num in range(1, 6):
             res = deploy_single_lkpd(num, ami_id, subnet_id, sg_id)
             results.append(res)
             time.sleep(2)
+        res_swarm = deploy_swarm(ami_id, subnet_id, sg_id)
+        results.extend(res_swarm)
+        time.sleep(2)
+        res_lkpd7 = deploy_single_lkpd(7, ami_id, subnet_id, sg_id)
+        results.append(res_lkpd7)
+        time.sleep(2)
+        res_lkpd8 = deploy_lkpd8_cluster(ami_id, subnet_id, sg_id)
+        results.extend(res_lkpd8)
     elif args.lkpd:
-        res = deploy_single_lkpd(args.lkpd, ami_id, subnet_id, sg_id)
-        results.append(res)
+        if args.lkpd == 6:
+            res_swarm = deploy_swarm(ami_id, subnet_id, sg_id)
+            results.extend(res_swarm)
+        elif args.lkpd == 8:
+            res_lkpd8 = deploy_lkpd8_cluster(ami_id, subnet_id, sg_id)
+            results.extend(res_lkpd8)
+        else:
+            res = deploy_single_lkpd(args.lkpd, ami_id, subnet_id, sg_id)
+            results.append(res)
     else:
-        logger.error("Tentukan opsi --lkpd <1-5>, --tugas2, --tugas3, atau --all.")
+        logger.error("Tentukan opsi --lkpd <1-8>, --swarm, --tugas2, --tugas3, atau --all.")
         sys.exit(1)
 
     summary_file = os.path.join(os.path.dirname(__file__), "output", "summary.json")
@@ -264,6 +335,8 @@ def cmd_status(args):
         task_filter = "tugas3"
     elif getattr(args, "tugas2", False):
         task_filter = "tugas2"
+    elif getattr(args, "swarm", False):
+        args.lkpd = 6
     instances = get_instances_status(lkpd_filter=args.lkpd, task_filter=task_filter)
     print("\n" + "="*85)
     print(f"STATUS INSTANCE AWS ({len(instances)} ditemukan):")
@@ -419,31 +492,66 @@ def cmd_update(args):
 def cmd_terminate(args):
     is_tugas2 = getattr(args, "tugas2", False)
     is_tugas3 = getattr(args, "tugas3", False)
-    if not args.all and not args.lkpd and not is_tugas2 and not is_tugas3:
-        logger.error("Gunakan flag --lkpd <1-5>, --tugas2, --tugas3, atau --all untuk terminate.")
+    is_swarm = getattr(args, "swarm", False) or args.lkpd == 6
+    if not args.all and not args.lkpd and not is_tugas2 and not is_tugas3 and not is_swarm:
+        logger.error("Gunakan flag --lkpd <1-8>, --swarm, --tugas2, --tugas3, atau --all untuk terminate.")
         sys.exit(1)
 
     task_filter = "tugas3" if is_tugas3 else ("tugas2" if is_tugas2 else None)
-    lkpd_filter = args.lkpd if not args.all and not is_tugas2 and not is_tugas3 else None
+    lkpd_filter = 6 if is_swarm else (args.lkpd if not args.all and not is_tugas2 and not is_tugas3 else None)
     term_ids = terminate_instances(lkpd_filter=lkpd_filter, task_filter=task_filter)
     if term_ids:
         logger.info(f"Berhasil meminta terminasi untuk {len(term_ids)} instance: {term_ids}")
     else:
         logger.info("Tidak ada instance yang di-terminate.")
 
+def cmd_aws_doctor(args):
+    from aws.doctor import run_aws_doctor
+    is_healthy = run_aws_doctor(
+        repair=getattr(args, "repair", False),
+        verify=getattr(args, "verify", False),
+        target_instance_id=getattr(args, "instance", None)
+    )
+    if not is_healthy:
+        sys.exit(1)
+
 def main():
     parser = argparse.ArgumentParser(description="AWS LKPD Docker Automation CLI (Boto3 + UserData)")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # AWS Doctor (Audit, Diagnosis, Safe Repair, Verification)
+    sub_doctor = subparsers.add_parser(
+        "aws-doctor",
+        help="Audit mendalam kredensial AWS, diagnosa EC2/SSM, perbaikan aman, dan verifikasi ulang"
+    )
+    sub_doctor.add_argument(
+        "--repair",
+        action="store_true",
+        help="Jalankan perbaikan otomatis yang aman (sinkronisasi kredensial, perbaikan region, izin ACL)"
+    )
+    sub_doctor.add_argument(
+        "--verify",
+        action="store_true",
+        help="Jalankan verifikasi ulang paska perbaikan termasuk pengujian SSM live command"
+    )
+    sub_doctor.add_argument(
+        "--instance",
+        type=str,
+        default=None,
+        help="ID instance EC2 tertentu untuk pengujian SSM live command"
+    )
+    sub_doctor.set_defaults(func=cmd_aws_doctor)
 
     # Validate
     sub_val = subparsers.add_parser("validate", help="Pre-flight check seluruh konfigurasi AWS & kredensial")
     sub_val.set_defaults(func=cmd_validate)
 
     # Create
-    sub_create = subparsers.add_parser("create", help="Membuat EC2 dan menjalankan otomatisasi LKPD / Tugas 2 / Tugas 3")
+    sub_create = subparsers.add_parser("create", help="Membuat EC2 dan menjalankan otomatisasi LKPD / Tugas 2 / Tugas 3 / Swarm")
     group_create = sub_create.add_mutually_exclusive_group(required=True)
-    group_create.add_argument("--lkpd", type=int, choices=[1, 2, 3, 4, 5], help="Nomor LKPD tertentu (1-5)")
-    group_create.add_argument("--all", action="store_true", help="Deploy seluruh LKPD (1 sampai 5)")
+    group_create.add_argument("--lkpd", type=int, choices=[1, 2, 3, 4, 5, 6, 7, 8], help="Nomor LKPD tertentu (1-8)")
+    group_create.add_argument("--swarm", action="store_true", help="Deploy Docker Swarm Multi-Node Cluster (LKPD 6: Manager + Worker)")
+    group_create.add_argument("--all", action="store_true", help="Deploy seluruh LKPD (1 sampai 8)")
     group_create.add_argument("--tugas2", action="store_true", help="Deploy instance baru khusus Tugas 2 (App ID Card)")
     group_create.add_argument("--tugas3", action="store_true", help="Deploy instance baru khusus Tugas 3 (App Reservasi Ruangan)")
     sub_create.set_defaults(func=cmd_create)
@@ -451,7 +559,8 @@ def main():
     # Status
     sub_status = subparsers.add_parser("status", help="Melihat status instance aktif")
     group_status = sub_status.add_mutually_exclusive_group(required=False)
-    group_status.add_argument("--lkpd", type=int, choices=[1, 2, 3, 4, 5], help="Filter berdasarkan nomor LKPD")
+    group_status.add_argument("--lkpd", type=int, choices=[1, 2, 3, 4, 5, 6, 7, 8], help="Filter berdasarkan nomor LKPD")
+    group_status.add_argument("--swarm", action="store_true", help="Filter khusus instance Docker Swarm (LKPD 6)")
     group_status.add_argument("--tugas2", action="store_true", help="Filter khusus instance Tugas 2")
     group_status.add_argument("--tugas3", action="store_true", help="Filter khusus instance Tugas 3")
     sub_status.set_defaults(func=cmd_status)
@@ -469,7 +578,8 @@ def main():
     # Terminate
     sub_term = subparsers.add_parser("terminate", help="Menghentikan / menghapus instance")
     group_term = sub_term.add_mutually_exclusive_group(required=True)
-    group_term.add_argument("--lkpd", type=int, choices=[1, 2, 3, 4, 5], help="Nomor LKPD yang ingin di-terminate")
+    group_term.add_argument("--lkpd", type=int, choices=[1, 2, 3, 4, 5, 6, 7, 8], help="Nomor LKPD yang ingin di-terminate")
+    group_term.add_argument("--swarm", action="store_true", help="Terminate khusus klaster Docker Swarm (LKPD 6)")
     group_term.add_argument("--all", action="store_true", help="Terminate semua instance LKPD")
     group_term.add_argument("--tugas2", action="store_true", help="Terminate khusus instance Tugas 2")
     group_term.add_argument("--tugas3", action="store_true", help="Terminate khusus instance Tugas 3")

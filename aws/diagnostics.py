@@ -24,6 +24,8 @@ def inspect_all():
         "3": 8001,
         "4": 8002,
         "5": 8088,
+        "6": 8080,
+        "7": 8080,
         "tugas2": 8080,
         "tugas3": 8083
     }
@@ -76,9 +78,16 @@ def inspect_all():
                 ]}
             )
             cmd_id = cmd["Command"]["CommandId"]
-            time.sleep(2)
-            out = ssm.get_command_invocation(CommandId=cmd_id, InstanceId=inst_id)
-            stdout = out.get("StandardOutputContent", "")
+            stdout = ""
+            for _ in range(6):
+                time.sleep(1)
+                try:
+                    out = ssm.get_command_invocation(CommandId=cmd_id, InstanceId=inst_id)
+                    if out.get("Status") in ["Success", "Failed"]:
+                        stdout = out.get("StandardOutputContent", "")
+                        break
+                except Exception:
+                    pass
 
             # Parsing status JSON
             st_val = "UNKNOWN"

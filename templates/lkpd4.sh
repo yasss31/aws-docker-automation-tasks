@@ -17,7 +17,7 @@ if ! docker image inspect ubuntu-ws:v1 &>/dev/null; then
     cat <<'EOF' > /root/bws/Dockerfile
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y apache2 php curl && apt clean && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y apache2 php php-mysqli php-mysql curl && apt clean && rm -rf /var/lib/apt/lists/*
 EXPOSE 80
 CMD ["apache2ctl", "-D", "FOREGROUND"]
 EOF
